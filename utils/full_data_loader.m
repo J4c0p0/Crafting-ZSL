@@ -2,7 +2,7 @@ function [imdbTrain, imdbTestUnseen, imdbTestSeen, UnseenClasses] =  full_data_l
 
 path_ = pather();
 
-if ~exist(path_.(dataset_name_),'dir') && sprintf(dataset_name_,'AWA2')
+if isnan(path_) && sprintf(dataset_name_,'AWA2')
     addpath('./splits/')
     path_ = emergency_AWA_2_downloader();
 else
