@@ -6,7 +6,7 @@ At the moment, the code only encompasses zero-shot learning evaluation, allowing
 
 The final repository is under construction, and updates are expected in the near future. 
 
-While you wait for them, why don't you  <a href="https://www.youtube.com/watch?v=h46L87xjXx0">tango</a> a bit?
+<i>While you wait for them, why don't you  <a href="https://www.youtube.com/watch?v=h46L87xjXx0">tango</a> a bit?</i>
 
 ### Prerequisites
 ```
