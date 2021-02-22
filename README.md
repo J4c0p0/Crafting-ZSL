@@ -1,4 +1,4 @@
-## Classifier Crafting : Turn your ConveNet into a Zero-Shot Learner
+# Classifier Crafting : Turn your ConveNet into a Zero-Shot Learner!
 
 This repository contains the supporting code for my recent pre-print [<a href="https:xxx">link</a>]
 
