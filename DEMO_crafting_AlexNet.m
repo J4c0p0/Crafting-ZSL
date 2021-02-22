@@ -71,7 +71,8 @@ options = trainingOptions(solver_name_, ...
 save([path2ckp_ '\training_info.mat'],'info');
 
 %% Clear all checkpoints but the last
-list_of_ckps = dir([path2ckp_ '\net_checkpoint*.mat]);
+list_of_ckps = dir([path2ckp_ '\net_checkpoint*.mat']);
+iteration_number = nan(length(list_of_ckps),1);
 for d = 1 : length(list_of_ckps)
     where_slash_in_ckp_name = strfind(list_of_ckps(d).name,'_'); %net_checkpoint__X...
     iteration_number(d,1) = str2double(list_of_ckps(d).name(where_slash_in_ckp_name(3)+1 : where_slash_in_ckp_name(4)-1));
