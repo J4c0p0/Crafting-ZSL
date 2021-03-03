@@ -8,4 +8,3 @@ for i = 1 : length(net.Layers)
 end
 
 net_cut = net.Layers(1:position_cut);
-
