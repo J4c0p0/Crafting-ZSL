@@ -86,8 +86,6 @@ end
 
 [imdbTrain, imdbTestUnseen, imdbTestSeen, UnseenClasses] =  full_data_loader(dataset_name_,true);
 
-tic;
-
 AllClasses = categories(imdbTrain.Labels);
 numClasses = numel(AllClasses);
 %Note that, I am always working with image databases spanning the *whole
@@ -121,10 +119,10 @@ layers_cut = net_cutter(net,cut_at_layer_name);
 size_ = net.Layers(1).InputSize;
 
 %% Data augmentation (optional, here only reshaping dimension and grayscale to RGB conversion)
-[augimdbTrain, TrainLabels] = augment_imdb(imdbTrain,size_);
-[augimdbTestUnseen, TestUnseenLabels] = augment_imdb(imdbTestUnseen,size_);
+[augimdbTrain, TrainLabels] = augment_imdb(imdbTrain,size_,dataset_name_);
+[augimdbTestUnseen, TestUnseenLabels] = augment_imdb(imdbTestUnseen,size_,dataset_name_);
 if ~flag_ZSL
-    [augimdbTestSeen, TestSeenLabels] = augment_imdb(imdbTestSeen,size_);
+    [augimdbTestSeen, TestSeenLabels] = augment_imdb(imdbTestSeen,size_,dataset_name_);
 end
 
 if ~flag_semantic_craft
@@ -143,6 +141,8 @@ options = trainingOptions(solver_name_, ...
     'Plots','training-progress');
 crafted_layers(end-2).BiasLearnRateFactor = 1e-9;
 crafted_layers(end-2).WeightLearnRateFactor = 1e-9;
+
+tic;
 
 fprintf('Training the network ..')
 [crafted_net, info] = trainNetwork(augimdbTrain,crafted_layers,options);
