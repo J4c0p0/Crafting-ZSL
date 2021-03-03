@@ -12,5 +12,5 @@ The final repository is under construction, and updates are expected in the near
 ```
 MATLAB R2020b
 cuda 10.2
-28 GB space disk (where to download AWA2)
+28 GB space disk (where to download AWA2, the process is automatically handled by the demo!)
 ```
