@@ -1,13 +1,56 @@
 clear; close all; clc;
 
+% Implementing the idea of crafting a convnet, imposing fixed classification
+% rules that, since defined upon class embeddings (or inferred visual prototypes)
+% will generalize, by design, towards classes unseen at training time. By doing so, 
+% we cast a "vanilla" convnect into a zero-shot learner
+%
+% Expected Results:
+% Semantic Crafting + AlexNet: 0.40/0.43 on T1 (ZSL unseen top-1 classification score)
+%
+% Copyright (c) 2021 Jacopo Cavazza
+%
+% This code is a third-party implementation of the ICML 2015 paper
+% entitled "An Embarassingly Simple Approach for Zero-Shot Learning" and
+% authored by B. R. Paredes and P. H. Torr (from the Oxford University,
+% Department of Engineering Science, Parks Road, Oxford, OX1 3PJ, UK).
+% Therefore, the IP of the algorithm coded here is not proprietary
+% of the author of the code who downloaded the publicly available paper
+% from http://proceedings.mlr.press/v37/romera-paredes15.pdf and re-coded
+% by himself, exploiting publicly avaialable data from a prior repository
+% (related to the paper [Norouzi et al., Zero-Shot Learning by Convex
+% Combination of Semantic Embeddings, ICLR 2014]).
+%
+% Permission is hereby granted, free of charge, to any person
+% obtaining a copy of this software and associated documentation
+% files (the "Software"), to deal in the Software without
+% restriction, including without limitation the rights to use,
+% copy, modify, merge, publish, distribute, sublicense, and/or sell
+% copies of the Software, and to permit persons to whom the
+% Software is furnished to do so, subject to the following
+% conditions:
+%
+% The above copyright notice and this permission notice shall be
+% included in all copies or substantial portions of the Software.
+%
+% THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+% EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+% OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+% NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+% HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+% WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+% FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+% OTHER DEALINGS IN THE SOFTWARE.
+
 %% Hyper-params
 
 dataset_name_ = 'AWA2';
+flag_ZSL = true;
 flag_semantic_craft = true; %Set it to false for visual crafting
 
 solver_name_ = 'adam';
 MiniBatchSize_ = 256;
-MaxEpochs_ = 10;
+MaxEpochs_ = 5;
 InitialLearnRate_ = 1e-4;
 path2ckp_ = '.\ckp';
 
@@ -17,21 +60,33 @@ path2ckp_ = '.\ckp';
 
 addpath('.\utils\')
 
+
 %% Setting directory to save checkpoints
-path2ckp_ = [path2ckp_ '\alexnet\' dataset_name_ '\' solver_name_ '_Batch' sprintf('%d',MiniBatchSize_) '_Epochs' sprintf('%d',MaxEpochs_) '_lr' sprintf('%1.0e',InitialLearnRate_)];
+
+if flag_semantic_craft
+    path2ckp_ = [path2ckp_ '\alexnet\semantic'];
+else
+    path2ckp_ = [path2ckp_ '\alexnet\visual'];
+end
+path2ckp_ = [path2ckp_ '\' solver_name_ '_Batch' sprintf('%d',MiniBatchSize_) '_Epochs' sprintf('%d',MaxEpochs_) '_lr' sprintf('%1.0e',InitialLearnRate_)];
 if exist(path2ckp_,'dir')
-    error('Experiment already run!')
+    warning('Experiment already run!')
+    str_ = input('Overwrite? [Y/n]');
+    if strcmpi(str_,'n')
+        return
+    else
+        clc;
+        delete([path2ckp_ '\*']);
+    end
 else
     mkdir(path2ckp_);
 end
 
 %% Loading data
 
-if ~ismember(dataset_name_,{'AWA2','CUB','SUN','FLO'})
-    error('Unsupported dataset: must be either AWA2, CUB, SUN or FLO');
-end
-
 [imdbTrain, imdbTestUnseen, imdbTestSeen, UnseenClasses] =  full_data_loader(dataset_name_,true);
+
+tic;
 
 AllClasses = categories(imdbTrain.Labels);
 numClasses = numel(AllClasses);
@@ -44,6 +99,20 @@ numClasses = numel(AllClasses);
 %allocating unused bins in the softmax classifier, and these bins will not
 %really optimized by gradient descent - since no labels from the unseen
 %classe are there.
+
+%Permuting attributes to match order in AllClasses
+load('./splits/class_embeddings_Xian.mat')
+tmp_data = nan(size(class_embeddings.(dataset_name_).data));
+for i = 1 : length(AllClasses)
+    [~,pos] = ismember(AllClasses{i},class_embeddings.(dataset_name_).classes);
+    tmp_data(i,:) = class_embeddings.(dataset_name_).data(pos,:);
+end
+if ismember(1,unique(isnan(tmp_data(:))))
+    error('Some attributes where not correclty written');
+end
+class_embeddings.AWA2.data = tmp_data;
+class_embeddings.AWA2.classes = AllClasses;
+save('./splits/class_embeddings_Xian.mat','class_embeddings');
 
 %% Load AlexNet (and related spec)
 net = alexnet;
@@ -58,8 +127,13 @@ if ~flag_ZSL
     [augimdbTestSeen, TestSeenLabels] = augment_imdb(imdbTestSeen,size_);
 end
 
+if ~flag_semantic_craft
+    compute_protos(net,dataset_name_,augimdbTrain,TrainLabels,cut_at_layer_name )
+end
+
 %% Training the crafted network
 crafted_layers = crafting_net(layers_cut,dataset_name_,flag_semantic_craft);
+
 options = trainingOptions(solver_name_, ...
     'MiniBatchSize',MiniBatchSize_, ...
     'MaxEpochs',MaxEpochs_, ...
@@ -67,7 +141,13 @@ options = trainingOptions(solver_name_, ...
     'Verbose',false, ...
     'CheckpointPath',path2ckp_, ...
     'Plots','training-progress');
+crafted_layers(end-2).BiasLearnRateFactor = 1e-9;
+crafted_layers(end-2).WeightLearnRateFactor = 1e-9;
+
+fprintf('Training the network ..')
 [crafted_net, info] = trainNetwork(augimdbTrain,crafted_layers,options);
+fprintf(' done!\n');
+
 save([path2ckp_ '\training_info.mat'],'info');
 
 %% Clear all checkpoints but the last
@@ -78,29 +158,37 @@ for d = 1 : length(list_of_ckps)
     iteration_number(d,1) = str2double(list_of_ckps(d).name(where_slash_in_ckp_name(3)+1 : where_slash_in_ckp_name(4)-1));
 end
 [iteration_number,idx_] = sort(iteration_number);
-for d = 1 : lengt(list_of_ckps)
+for d = 1 : length(list_of_ckps)
   delete([list_of_ckps(d).folder '\' list_of_ckps(d).name]);
 end
 
 %% Checking Training Accuracy
-load('./splits/class_embeddings_Xian.mat','class_embeddings')
-attSeen = single(class_embeddings.(dataset_name_).data');
-attSeen(:,ismember(class_embeddings.FLO.classes,UnseenClasses)) = NaN;
 
-featuresTrain = squeeze(activations(crafted_net,imdbTrain,'relu_2'));
-DISTmat = pdist2(featuresTrain',attSeen','cosine');
-[~,pos] = min(DISTmat,[],2);
-PredTrainLabels = AllClasses(pos);
-
+fprintf('Computing training accuracy ..')
+% attSeen = single(class_embeddings.(dataset_name_).data');
+% attSeen(:,ismember(class_embeddings.AWA2.classes,UnseenClasses)) = NaN;
+% 
+% featuresTrain = squeeze(activations(crafted_net,augimdbTrain,'relu_2'));
+% scoresSeen = transpose(attSeen)*featuresTrain;
+% [~,pos] = max(scoresSeen,[],1);
+PredTrainLabels = classify(crafted_net,augimdbTrain);
+% 
 TrainAcc = mean(PredTrainLabels == TrainLabels);
+fprintf('done!\n')
 
 %% Checking Top-1 Testing Accuracy over Unseen Classes (Zero-Shot Learning)
+load('./splits/class_embeddings_Xian.mat','class_embeddings')
 attUnseen = single(class_embeddings.(dataset_name_).data');
-attUnseen(:,~ismember(class_embeddings.FLO.classes,UnseenClasses)) = NaN;
+attUnseen(:,~ismember(AllClasses,UnseenClasses)) = NaN;
 
-featuresTest = squeeze(activations(net,imdbTestUnseen,'relu_2'));
-DISTmat = pdist2(featuresTest',attUnseen');
-[~,pos] = min(DISTmat,[],2);
-PredTestUnseenLabels = AllClasses(pos);
+fprintf('Computing testing accuracy ..')
+featuresTest = squeeze(activations(crafted_net,augimdbTestUnseen,'relu_2'));
+scoresUnseen = transpose(attUnseen)*featuresTest;
+[~,pos] = max(scoresUnseen,[],1);
+PredTestUnseenLabels = categorical(AllClasses(pos));
+fprintf('done!\n');
     
-T1 = mean(PredTestUnseenLabels == TestUnseenLabels);   
+T1 = mean(PredTestUnseenLabels == TestUnseenLabels); 
+
+fprintf(['ZSL top-1 classification accuracy over unseen classes: T1 = %2.2f%%\n'...
+'Elapsed time = %f seconds (I am not considering the time to download and unzip) \n'],T1*100,toc);
