@@ -1,4 +1,3 @@
-
 function [imdbSeen, imdbUnseen] = ZSL_data_loader(imdb,UnseenClasses)
 %% Exemplar input to run
 %clear; close all; clc;
