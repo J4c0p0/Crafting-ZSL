@@ -2,19 +2,19 @@ function [imdbTrain, imdbTestUnseen, imdbTestSeen, UnseenClasses] =  full_data_l
 
 path_ = pather();
 
-if isnan(path_) && sprintf(dataset_name_,'AWA2')
+if isnan(path_) && strcmpi(dataset_name_,'AWA2')
     addpath('./splits/')
-    path_ = emergency_AWA_2_downloader();
+    path_ = emergency_AWA2_downloader();
 else
     error('Please specify the path for the current dataset, inside pather.m')
 end
 
 if exist(['./splits/' dataset_name_ '_unseen_classes.txt'],'file')
-    UnseenClasses = importdata(['../splits/' dataset_name_ '_unseen_classes.txt']);
+    UnseenClasses = importdata(['./splits/' dataset_name_ '_unseen_classes.txt']);
 else
     if exist(['./splits/create_txt_files_data_' dataset_name_ '.m'],'file')
         run(['./splits/create_txt_files_data_' dataset_name_ '.m']);
-        UnseenClasses = importdata(['../splits/' dataset_name_ '_unseen_classes.txt']);
+        UnseenClasses = importdata(['./splits/' dataset_name_ '_unseen_classes.txt']);
     else
         error('xls and txt files for (G)ZSL splits are needed!');
     end
