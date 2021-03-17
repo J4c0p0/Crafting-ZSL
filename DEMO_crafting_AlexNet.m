@@ -10,16 +10,6 @@ clear; close all; clc;
 %
 % Copyright (c) 2021 Jacopo Cavazza
 %
-% This code is a third-party implementation of the ICML 2015 paper
-% entitled "An Embarassingly Simple Approach for Zero-Shot Learning" and
-% authored by B. R. Paredes and P. H. Torr (from the Oxford University,
-% Department of Engineering Science, Parks Road, Oxford, OX1 3PJ, UK).
-% Therefore, the IP of the algorithm coded here is not proprietary
-% of the author of the code who downloaded the publicly available paper
-% from http://proceedings.mlr.press/v37/romera-paredes15.pdf and re-coded
-% by himself, exploiting publicly avaialable data from a prior repository
-% (related to the paper [Norouzi et al., Zero-Shot Learning by Convex
-% Combination of Semantic Embeddings, ICLR 2014]).
 %
 % Permission is hereby granted, free of charge, to any person
 % obtaining a copy of this software and associated documentation
